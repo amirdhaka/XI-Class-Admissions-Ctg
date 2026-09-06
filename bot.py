@@ -40,7 +40,7 @@ headers = {
     "Referer": "https://billpay.sonalibank.com.bd/XIClassAdmission/Fee/"
 }
 
-# --- ১. এটি আপনার স্টপ সিস্টেমের জন্য নতুন ভেরিয়েবল ---
+# --- ১. স্টপ সিস্টেম ভেরিয়েবল ---
 current_search_id = 0
 
 def get_data(tid):
@@ -70,7 +70,14 @@ async def process_student_results(update_or_query, data_list):
     msg_source = update_or_query.message if hasattr(update_or_query, 'message') else update_or_query
     final_output = "🏛️ <b>XI Admission Fee Result</b>\n\n"
     phones = []
+    
     for i, data in enumerate(data_list, 1):
+        # ফোন নম্বরের শুরুতে 88 ফরম্যাটিং
+        raw_phone = str(data['contact']).strip()
+        formatted_phone = raw_phone
+        if raw_phone != "N/A" and not raw_phone.startswith("88"):
+            formatted_phone = "88" + raw_phone
+
         final_output += (
             f"🎯 Result {i}\n"
             f"<pre>"
@@ -79,14 +86,15 @@ async def process_student_results(update_or_query, data_list):
             f"🔢 Roll: {data['roll']}\n"
             f"🏫 Board: {data['board']}\n"
             f"📆 Year: {data['year']}\n"
-            f"📳 Contact No: {data['contact']}\n"
+            f"📳 Contact No: {formatted_phone}\n"
             f"📝 Fee Type: {data['fee_type']}\n"
             f"💰 Fee Amount: {data['amount']}\n"
-            f"​​📅 Date: {data['date']}"
+            f"📅 Date: {data['date']}"
             f"</pre>\n\n"
         )
-        p = data["contact"].strip()[-11:]
-        if len(p) >= 11 and p not in phones: phones.append(p)
+        p = raw_phone[-11:]
+        if len(p) >= 11 and p not in phones:
+            phones.append(p)
 
     keyboard = []
     for ph in phones:
@@ -97,7 +105,7 @@ async def process_student_results(update_or_query, data_list):
     await msg_source.reply_text(final_output, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None)
 
 async def run_search(update_or_query, context, s_r, e_r):
-    # --- ২. এখানে স্টপ লজিক যোগ করা হয়েছে ---
+    # --- ২. স্টপ লজিক ---
     global current_search_id
     this_id = current_search_id 
     
@@ -108,7 +116,6 @@ async def run_search(update_or_query, context, s_r, e_r):
     total_range = e_r - s_r + 1
     
     for i, roll in enumerate(range(s_r, e_r + 1), 1):
-        # যদি ইউজার /start দেয়, তবে এই লুপটি এখানেই থেমে যাবে
         if this_id != current_search_id:
             return 
 
@@ -134,17 +141,17 @@ async def run_search(update_or_query, context, s_r, e_r):
     await msg_source.reply_text(f"✅ Done!\n📊 Found Students: {found_students}", 
                                 reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("👉 Next 500?", callback_data="next_500")]]))
 
-# --- ৩. স্টার্ট দিলে আগের সব কাজ বন্ধ করার ফাংশন ---
+# --- ৩. স্টার্ট দিলে আগের কাজ বন্ধ করার ফাংশন ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global current_search_id
-    current_search_id += 1 # এটি আগের চলমান সব সার্চকে বন্ধ করে দিবে
+    current_search_id += 1
     await update.message.reply_text("XI Class Admission Fee Scanner!", 
                                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Start Search", callback_data="btn_ready")]]))
 
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global current_search_id
     t = update.message.text.strip()
-    current_search_id += 1 # নতুন টেক্সট দিলে বা রোল দিলে আগের সার্চ বন্ধ হবে
+    current_search_id += 1
     try:
         if "-" in t:
             s, e = map(int, t.split("-"))
@@ -171,5 +178,4 @@ if __name__ == "__main__":
     application.add_handler(CallbackQueryHandler(callback_handler))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
     
-    # drop_pending_updates=True দিলে স্টার্ট দেওয়ার পর পুরনো কোনো জ্যাম থাকবে না
     application.run_polling(drop_pending_updates=True)
